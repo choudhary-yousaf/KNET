@@ -7,8 +7,8 @@
  * Usage: node knet-test.js
  */
 
-import { encryptAES, decryptAES, testEncryption, isValidEncryptionKey } from './knet/encryption.js';
-import { initiatePayment, validateCallback, getResponseCodeMeaning } from './knet/payment-client.js';
+import { encryptAES, decryptAES, testEncryption, isValidEncryptionKey } from './encryption.js';
+import { initiatePayment, validateCallback, getResponseCodeMeaning } from './payment-client.js';
 
 const colors = {
 	reset: '\x1b[0m',
