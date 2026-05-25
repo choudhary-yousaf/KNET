@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KNET Integration Hub</title>
+  <style>
+    :root {
+      --bg: #f7f3ef;
+      --card: #ffffff;
+      --text: #1f2428;
+      --muted: #667085;
+      --accent: #0f766e;
+      --border: #e5e7eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 15% 20%, #fff6d6 0%, transparent 35%),
+        radial-gradient(circle at 85% 10%, #d9f2ef 0%, transparent 40%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .wrap {
+      width: 100%;
+      max-width: 760px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 26px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+    }
+    h1 { margin: 0 0 8px; font-size: 30px; }
+    p { margin: 0 0 18px; color: var(--muted); }
+    .links { display: grid; gap: 10px; }
+    a {
+      display: block;
+      text-decoration: none;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #fff;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    a:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+    .hint { margin-top: 14px; font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>KNET Integration Hub</h1>
+    <p>Payment-only project flow for initiating and validating KNET transactions.</p>
+
+    <div class="links">
+      <a href="./knet-checkout.html">Open KNET Checkout Page</a>
+      <a href="./KNET-QUICK-START.md">Open KNET Quick Start</a>
+      <a href="./KNET-TESTING-GUIDE.md">Open KNET Testing Guide</a>
+      <a href="./KNET-ONLY-SETUP.md">Open KNET-Only Setup</a>
+    </div>
+
+    <div class="hint">
+      This workspace is now scoped to KNET integration and payment flow only.
+    </div>
+  </main>
+</body>
+</html>

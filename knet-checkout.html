@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KNET Checkout</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f3ef;
+        --card: #ffffff;
+        --ink: #231f20;
+        --muted: #6b6b6b;
+        --accent: #1f6feb;
+        --danger: #c62828;
+      }
+      body {
+        margin: 0;
+        font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande", "Lucida Sans", Arial, sans-serif;
+        background: radial-gradient(circle at top left, #fff7e6, var(--bg));
+        color: var(--ink);
+      }
+      .wrap {
+        max-width: 840px;
+        margin: 0 auto;
+        padding: 28px 18px 48px;
+      }
+      .hero {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      h1 {
+        font-size: 28px;
+        margin: 0;
+        letter-spacing: 0.2px;
+      }
+      .sub {
+        color: var(--muted);
+        margin: 0;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid #ece6df;
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .row label {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .row input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #dcd5cf;
+        font-size: 14px;
+      }
+      .totals {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 16px;
+        font-size: 16px;
+      }
+      .amount {
+        font-size: 22px;
+        font-weight: 700;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+      }
+      button {
+        border: none;
+        border-radius: 12px;
+        padding: 12px 18px;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      .primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .ghost {
+        background: #f5efe9;
+        color: #4b3f35;
+      }
+      .error {
+        margin-top: 14px;
+        color: var(--danger);
+        font-size: 13px;
+      }
+      .note {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 14px;
+      }
+      @media (max-width: 680px) {
+        .row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="hero">
+        <h1>Secure KNET Checkout</h1>
+        <p class="sub">Review your order and continue to KNET for payment.</p>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div>
+            <label for="order-id">Order Reference</label>
+            <input id="order-id" type="text" placeholder="Order ID" />
+          </div>
+          <div>
+            <label for="customer-email">Customer Email</label>
+            <input id="customer-email" type="email" placeholder="name@example.com" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="customer-name">Customer Name</label>
+            <input id="customer-name" type="text" placeholder="Customer name" />
+          </div>
+          <div>
+            <label for="delivery-zone">Delivery Zone</label>
+            <input id="delivery-zone" type="text" placeholder="Area or zone" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="product-description">Product Description</label>
+            <input id="product-description" type="text" placeholder="Bouquet / Service" />
+          </div>
+          <div>
+            <label for="amount">Amount (KWD)</label>
+            <input id="amount" type="number" min="0" step="0.001" placeholder="0.000" />
+          </div>
+        </div>
+
+        <div class="totals">
+          <span>Payable Total</span>
+          <span class="amount" id="amount-label">0.000 KWD</span>
+        </div>
+
+        <div class="actions">
+          <button class="primary" id="pay-now">Pay with KNET</button>
+          <button class="ghost" id="back-cart" type="button">Back to Cart</button>
+        </div>
+
+        <div class="error" id="error"></div>
+        <div class="note">
+          You will be redirected to the official KNET payment page to complete the transaction.
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const fields = {
+        orderId: document.getElementById('order-id'),
+        email: document.getElementById('customer-email'),
+        name: document.getElementById('customer-name'),
+        zone: document.getElementById('delivery-zone'),
+        product: document.getElementById('product-description'),
+        amount: document.getElementById('amount')
+      };
+      const amountLabel = document.getElementById('amount-label');
+      const errorBox = document.getElementById('error');
+      const payNow = document.getElementById('pay-now');
+      const backCart = document.getElementById('back-cart');
+
+      function formatAmount(value) {
+        const num = Number.parseFloat(value || 0);
+        if (Number.isNaN(num)) return '0.000';
+        return num.toFixed(3);
+      }
+
+      function setError(message) {
+        errorBox.textContent = message || '';
+      }
+
+      function setAmount(value) {
+        fields.amount.value = value;
+        amountLabel.textContent = `${formatAmount(value)} KWD`;
+      }
+
+      async function loadCartIfAvailable() {
+        try {
+          const response = await fetch('/cart.js', { credentials: 'include' });
+          if (!response.ok) return;
+          const cart = await response.json();
+          if (!cart || !cart.items) return;
+
+          const cartAmount = (cart.total_price || 0) / 100;
+          setAmount(formatAmount(cartAmount));
+
+          if (!fields.orderId.value && cart.token) {
+            fields.orderId.value = cart.token;
+          }
+          if (!fields.product.value && cart.items.length) {
+            fields.product.value = cart.items.map(item => item.title).join(', ');
+          }
+        } catch (error) {
+          // cart.js may not exist in non-storefront environments
+        }
+      }
+
+      function hydrateFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('orderId')) fields.orderId.value = params.get('orderId');
+        if (params.get('email')) fields.email.value = params.get('email');
+        if (params.get('name')) fields.name.value = params.get('name');
+        if (params.get('zone')) fields.zone.value = params.get('zone');
+        if (params.get('product')) fields.product.value = params.get('product');
+        if (params.get('amount')) setAmount(params.get('amount'));
+      }
+
+      backCart.addEventListener('click', () => {
+        window.location.href = '/cart';
+      });
+
+      fields.amount.addEventListener('input', () => {
+        amountLabel.textContent = `${formatAmount(fields.amount.value)} KWD`;
+      });
+
+      payNow.addEventListener('click', async () => {
+        setError('');
+
+        const payload = {
+          orderId: fields.orderId.value.trim() || `WEB-${Date.now()}`,
+          amount: formatAmount(fields.amount.value),
+          customerEmail: fields.email.value.trim(),
+          customerName: fields.name.value.trim(),
+          productDescription: fields.product.value.trim(),
+          deliveryZone: fields.zone.value.trim()
+        };
+
+        if (!payload.amount || Number.parseFloat(payload.amount) <= 0) {
+          setError('Please enter a valid amount before proceeding.');
+          return;
+        }
+
+        payNow.disabled = true;
+        payNow.textContent = 'Redirecting...';
+
+        try {
+          const response = await fetch('/api/knet/initiate-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          const json = await response.json();
+          if (!response.ok || !json.success) {
+            throw new Error(json.error || 'Failed to initiate payment');
+          }
+
+          window.location.href = json.paymentUrl;
+        } catch (error) {
+          setError(error.message || 'Payment could not be started.');
+          payNow.disabled = false;
+          payNow.textContent = 'Pay with KNET';
+        }
+      });
+
+      hydrateFromQuery();
+      loadCartIfAvailable();
+    </script>
+  </body>
+</html>
