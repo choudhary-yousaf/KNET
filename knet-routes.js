@@ -127,7 +127,7 @@ router.get('/initiate-payment', (_req, res) => {
  *
  * Response: KNET expects HTML with REDIRECT= parameter
  */
-router.post('/callback', express.text({ type: '*/*' }), async (req, res) => {
+router.post('/callback', async (req, res) => {
 	try {
 		// Get configuration from environment
 		const encryptionKey = process.env.KNET_ENCRYPTION_KEY;
@@ -137,8 +137,13 @@ router.post('/callback', express.text({ type: '*/*' }), async (req, res) => {
 			return res.status(500).send('Error: Server misconfiguration');
 		}
 
-		// Get encrypted response from request body
-		const encryptedResponse = req.body || '';
+		// Get encrypted response from request body (raw buffer from app-level middleware)
+		let encryptedResponse = '';
+		if (Buffer.isBuffer(req.body)) {
+			encryptedResponse = req.body.toString('utf8') || '';
+		} else {
+			encryptedResponse = req.body || '';
+		}
 
 		if (!encryptedResponse) {
 			console.error('[KNET] Callback: no response data received');

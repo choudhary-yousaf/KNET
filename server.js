@@ -5,7 +5,12 @@ import knetRoutes from './knet-routes.js';
 
 const app = express();
 
+// KNET sends raw POSTs to the callback endpoint; capture raw body for that route first
+app.use('/api/knet/callback', express.raw({ type: '*/*' }));
+
+// For other routes use JSON and URL-encoded parsers
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static('.'));
 
 function buildAllowedOrigins() {

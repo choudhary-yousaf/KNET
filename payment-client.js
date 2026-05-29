@@ -5,6 +5,9 @@
 
 import crypto from 'crypto';
 import { encryptAES, decryptAES } from './encryption.js';
+import { URLSearchParams } from 'url';
+
+// Node's global fetch is used for server-to-server calls
 
 /**
  * Build unencrypted KNET request string
@@ -31,21 +34,23 @@ function buildRequestString(params) {
 	const formattedAmount = parseFloat(amount).toFixed(3);
 
 	// Build request string in order (order doesn't strictly matter but this is conventional)
+	// Build request string following K-064 ordering. DO NOT URL-encode the values here;
+	// the whole string is encrypted as plaintext.
 	const parts = [
-		`amt=${formattedAmount}`,
-		`action=1`, // 1 = Purchase transaction
-		`responseURL=${encodeURIComponent(responseUrl)}`,
-		`errorURL=${encodeURIComponent(errorUrl)}`,
-		`trackid=${trackId}`,
-		`udf1=${encodeURIComponent(udf1)}`,
-		`udf2=${encodeURIComponent(udf2)}`,
-		`udf3=${encodeURIComponent(udf3)}`,
-		`udf4=${encodeURIComponent(udf4)}`,
-		`udf5=${encodeURIComponent(udf5)}`,
-		`currencycode=414`, // 414 = KWD (Kuwait Dinar)
-		`langid=${langId}`,
 		`id=${terminalId}`,
-		`password=${terminalPassword}`
+		`password=${terminalPassword}`,
+		`action=1`, // 1 = Purchase
+		`amt=${formattedAmount}`,
+		`currencycode=414`, // 414 = KWD
+		`langid=${langId}`,
+		`trackid=${trackId}`,
+		`responseURL=${responseUrl}`,
+		`errorURL=${errorUrl}`,
+		`udf1=${udf1}`,
+		`udf2=${udf2}`,
+		`udf3=${udf3}`,
+		`udf4=${udf4}`,
+		`udf5=${udf5}`
 	];
 
 	return parts.join('&');
@@ -58,7 +63,7 @@ function buildRequestString(params) {
  * @param {string} mode - 'test' or 'production'
  * @returns {object} { trackId, paymentUrl, requestString }
  */
-export function initiatePayment(params, encryptionKey, mode = 'test') {
+export async function initiatePayment(params, encryptionKey, mode = 'test') {
 	try {
 		// Validate required parameters
 		const { amount, terminalId, terminalPassword, responseUrl, errorUrl } = params;
@@ -66,8 +71,8 @@ export function initiatePayment(params, encryptionKey, mode = 'test') {
 			throw new Error('Missing required payment parameters');
 		}
 
-		// Generate unique track ID (use crypto random for security)
-		const trackId = crypto.randomBytes(8).toString('hex').toUpperCase();
+		// Generate unique track ID (alphanumeric)
+		const trackId = (`ORD${Date.now()}${crypto.randomBytes(4).toString('hex')}`).toUpperCase();
 
 		// Build unencrypted request string
 		const requestString = buildRequestString({
@@ -76,7 +81,7 @@ export function initiatePayment(params, encryptionKey, mode = 'test') {
 		});
 
 		// Encrypt the request string
-		const encryptedRequest = encryptAES(requestString, encryptionKey);
+		const trandata = encryptAES(requestString, encryptionKey);
 
 		// Select KNET endpoint based on mode
 		const baseUrl =
@@ -84,21 +89,60 @@ export function initiatePayment(params, encryptionKey, mode = 'test') {
 				? 'https://www.kpay.com.kw/kpg/PaymentHTTP.htm'
 				: 'https://kpaytest.com.kw/kpg/PaymentHTTP.htm';
 
-		// Build final payment URL
-		const paymentUrl = new URL(baseUrl);
-		paymentUrl.searchParams.set('param', 'paymentInit');
-		paymentUrl.searchParams.set('trandata', encryptedRequest);
-		paymentUrl.searchParams.set('responseURL', responseUrl);
-		paymentUrl.searchParams.set('errorURL', errorUrl);
-		paymentUrl.searchParams.set('tranportalId', terminalId);
+		// Build server-to-server request URL
+		const paramsObj = new URLSearchParams({
+			param: 'paymentInit',
+			trandata: trandata,
+			responseURL: responseUrl,
+			errorURL: errorUrl,
+			tranportalId: terminalId
+		});
 
-		return {
-			trackId,
-			paymentUrl: paymentUrl.toString(),
-			requestString: requestString,
-			encryptedRequest: encryptedRequest,
-			mode
-		};
+		const requestUrl = `${baseUrl}?${paramsObj.toString()}`;
+
+		// Server-to-server GET
+		const resp = await fetch(requestUrl, { method: 'GET' });
+		const body = await resp.text();
+
+		// KNET may return either key=value pairs containing trandata or a raw hex string
+		let paymentPageUrl = null;
+
+		if (body.includes('=')) {
+			const parsed = new URLSearchParams(body);
+			const encryptedResp = parsed.get('trandata');
+			const paymentId = parsed.get('paymentid') || null;
+			if (encryptedResp) {
+				const decrypted = decryptAES(encryptedResp.trim(), encryptionKey);
+				// decrypted often contains paymentPage or webaddress
+				const decParsed = new URLSearchParams(decrypted);
+				paymentPageUrl = decParsed.get('paymentPage') || decParsed.get('webaddress') || decParsed.get('URL');
+				if (!paymentPageUrl) {
+					// fallback: search for first https:// occurrence
+					const m = decrypted.match(/https?:\/\/[\S]+/i);
+					if (m) paymentPageUrl = m[0];
+				}
+			}
+			return {
+				trackId,
+				paymentUrl: paymentPageUrl,
+				rawResponse: body
+			};
+		} else {
+			// Treat body as encrypted hex
+			const decrypted = decryptAES(body.trim(), encryptionKey);
+			const decParsed = new URLSearchParams(decrypted);
+			paymentPageUrl = decParsed.get('paymentPage') || decParsed.get('webaddress') || decParsed.get('URL');
+			if (!paymentPageUrl) {
+				const m = decrypted.match(/https?:\/\/[\S]+/i);
+				if (m) paymentPageUrl = m[0];
+			}
+
+			return {
+				trackId,
+				paymentUrl: paymentPageUrl,
+				rawResponse: body
+			};
+		}
 	} catch (error) {
 		throw new Error(`Failed to initiate payment: ${error.message}`);
 	}
